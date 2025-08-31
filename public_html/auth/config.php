@@ -1,9 +1,21 @@
 <?php
-// Database configuration
-define('DB_HOST', 'localhost');
-define('DB_NAME', 'website_mirror');
-define('DB_USER', 'root');
-define('DB_PASS', '');
+// Database configuration from environment
+$database_url = getenv('DATABASE_URL');
+if ($database_url) {
+    $db_parts = parse_url($database_url);
+    define('DB_HOST', $db_parts['host']);
+    define('DB_NAME', ltrim($db_parts['path'], '/'));
+    define('DB_USER', $db_parts['user']);
+    define('DB_PASS', $db_parts['pass']);
+    define('DB_PORT', $db_parts['port'] ?? 5432);
+} else {
+    // Fallback configuration
+    define('DB_HOST', 'localhost');
+    define('DB_NAME', 'website_mirror');
+    define('DB_USER', 'root');
+    define('DB_PASS', '');
+    define('DB_PORT', 5432);
+}
 
 // Application configuration
 define('SITE_URL', 'http://localhost');
@@ -25,7 +37,7 @@ function getDBConnection() {
     
     if ($pdo === null) {
         try {
-            $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4";
+            $dsn = "pgsql:host=" . DB_HOST . ";port=" . DB_PORT . ";dbname=" . DB_NAME . ";sslmode=require";
             $options = [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -34,29 +46,7 @@ function getDBConnection() {
             
             $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
             
-            // Create users table if it doesn't exist
-            $pdo->exec("
-                CREATE TABLE IF NOT EXISTS users (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    username VARCHAR(50) UNIQUE NOT NULL,
-                    email VARCHAR(100) UNIQUE NOT NULL,
-                    password VARCHAR(255) NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    last_login TIMESTAMP NULL,
-                    is_active BOOLEAN DEFAULT TRUE
-                )
-            ");
-            
-            // Create login attempts table
-            $pdo->exec("
-                CREATE TABLE IF NOT EXISTS login_attempts (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    ip_address VARCHAR(45) NOT NULL,
-                    username VARCHAR(50),
-                    attempted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    success BOOLEAN DEFAULT FALSE
-                )
-            ");
+            // Tables are already created via Drizzle schema, just verify connection
             
             // Insert default user if not exists
             $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE username = ?");
@@ -64,8 +54,8 @@ function getDBConnection() {
             
             if ($stmt->fetchColumn() == 0) {
                 $hashedPassword = password_hash(DEFAULT_PASSWORD, PASSWORD_DEFAULT);
-                $stmt = $pdo->prepare("INSERT INTO users (username, email, password) VALUES (?, ?, ?)");
-                $stmt->execute([DEFAULT_USERNAME, DEFAULT_USERNAME . '@example.com', $hashedPassword]);
+                $stmt = $pdo->prepare("INSERT INTO users (username, password_hash, nickname, balance, status) VALUES (?, ?, ?, ?, ?)");
+                $stmt->execute([DEFAULT_USERNAME, $hashedPassword, DEFAULT_USERNAME, '1000.00', 'active']);
             }
             
         } catch (PDOException $e) {
@@ -111,7 +101,7 @@ function checkLoginAttempts($ip, $username = null) {
     
     $stmt = $pdo->prepare("
         SELECT COUNT(*) FROM login_attempts 
-        WHERE ip_address = ? AND attempted_at > DATE_SUB(NOW(), INTERVAL ? SECOND) AND success = FALSE
+        WHERE ip_address = ? AND attempted_at > NOW() - INTERVAL '1 second' * ? AND success = FALSE
     ");
     $stmt->execute([$ip, LOGIN_LOCKOUT_TIME]);
     
