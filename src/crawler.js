@@ -51,23 +51,27 @@ class Crawler {
                 timeout: 30000 
             });
             
-            // Look for login form or login link
-            const loginSelector = 'a[href*="login"], input[type="password"], form[action*="login"]';
-            await this.page.waitForSelector(loginSelector, { timeout: 10000 });
+            // Wait for page to load completely
+            await this.page.waitForSelector('body', { timeout: 10000 });
+            await new Promise(resolve => setTimeout(resolve, 3000));
             
-            // Try to find login form
-            const hasPasswordField = await this.page.$('input[type="password"]');
+            // Look for Element UI login form in header (loginBar class)
+            const headerLoginExists = await this.page.$('.loginBar');
             
-            if (hasPasswordField) {
-                // Direct login form on page
-                await this.fillLoginForm(username, password);
+            if (headerLoginExists) {
+                this.logger.info('Found header login form, attempting to authenticate...');
+                await this.fillHeaderLoginForm(username, password);
             } else {
-                // Need to navigate to login page
-                const loginLink = await this.page.$('a[href*="login"]');
-                if (loginLink) {
-                    await loginLink.click();
-                    await this.page.waitForNavigation({ waitUntil: 'networkidle2' });
+                this.logger.info('No header login found, checking for dedicated login page...');
+                // Try to navigate to login page
+                try {
+                    await this.page.goto(this.targetConfig.baseUrl + '/login', { 
+                        waitUntil: 'networkidle2',
+                        timeout: 30000 
+                    });
                     await this.fillLoginForm(username, password);
+                } catch (loginPageError) {
+                    this.logger.warn('No login page found either, continuing without authentication');
                 }
             }
             
@@ -75,6 +79,48 @@ class Crawler {
             
         } catch (error) {
             this.logger.warn('Authentication failed or not required:', error.message);
+        }
+    }
+
+    async fillHeaderLoginForm(username, password) {
+        try {
+            // Wait for Element UI input fields in the header
+            await this.page.waitForSelector('.loginBar .el-input__inner', { timeout: 10000 });
+            
+            // Get all input fields in the login bar
+            const inputFields = await this.page.$$('.loginBar .el-input__inner');
+            
+            if (inputFields.length >= 2) {
+                // First field is username (账号)
+                const usernameField = inputFields[0];
+                await usernameField.click();
+                await usernameField.type(username);
+                
+                // Second field is password (密码)
+                const passwordField = inputFields[1];
+                await passwordField.click();
+                await passwordField.type(password);
+                
+                // Wait a moment for form to update
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Click login button (登录)
+                const loginButton = await this.page.$('.loginBar .el-button--primary');
+                if (loginButton) {
+                    await loginButton.click();
+                    
+                    // Wait for potential navigation or page update
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    
+                    this.logger.info('Header login form submitted');
+                } else {
+                    this.logger.warn('Login button not found in header');
+                }
+            } else {
+                this.logger.warn('Expected login input fields not found in header');
+            }
+        } catch (error) {
+            this.logger.warn('Failed to fill header login form:', error.message);
         }
     }
 
