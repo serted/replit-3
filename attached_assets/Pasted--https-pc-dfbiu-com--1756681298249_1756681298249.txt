@@ -1,0 +1,185 @@
+Требования заказчика
+Цель: Полный клон сайта https://pc.dfbiu.com с независимой серверной частью на PHP и своей базой данных.
+
+Функции:
+
+Регистрация/авторизация — работают на вашем сервере, без обращений к оригинальному API.
+
+Хранение данных — все учетные записи, логины, пароли, профиль, баланс — в вашей БД.
+
+Пиксель-в-пиксель фронтенд — визуал и поведение совпадают с эталоном.
+
+Админка — управление пользователями: создание, изменение никнейма, баланса.
+
+Исходников нет: Нужно собрать фронтенд-статик из браузера (рендером), а затем «подсадить» свой PHP‑бэкенд и перепривязать формы/запросы.
+
+Критерии приемки
+Пиксель-в-пиксель совпадение всех страниц, включая авторизованные.
+
+Полная независимость: ни один запрос не уходит на домены эталона.
+
+Авторизация/регистрация работают на вашем PHP, учетные данные сохраняются в вашей БД.
+
+Аккаунт после входа ведет себя как на эталоне (UI‑состояние, доступ к страницам).
+
+Админка позволяет создавать пользователей и менять ник/баланс.
+
+Тест‑логин: при необходимости поддержать тестовый вход (login: test228, pass: test228) уже на вашем сервере.
+
+Готовый промпт для Replit
+Представь, что ты — Senior Full‑Stack Engineer. Создай новый проект, который:
+
+Сбор фронтенда из эталона
+
+Headless-скрейпинг: через браузерный рендер обойти все публичные и авторизованные страницы https://pc.dfbiu.com (включая /login, /register и разделы, появляющиеся после входа).
+
+Авторизация: выполнить логин тестовыми данными (test228 / test228) и зафиксировать пост‑логин навигацию.
+
+Сохранение: для каждой страницы сохранить финальный HTML (после выполнения JS), скачать все ассеты (CSS, JS, изображения, шрифты).
+
+Пути: переписать ссылки на ассеты в относительные.
+
+Структура: сложить результат в public_html/ (assets/, css/, js/, img/ и т.д.).
+
+Инъекция патча: в каждый сохраненный HTML добавить <script src="/js/patch.js"></script> перед </body>.
+
+PHP‑бэкенд (независимый от оригинала)
+
+БД: создать SQL‑дамп db/schema.sql с таблицами users, sessions, audit_logs.
+
+Конфиг: создать config/db.php с PDO‑подключением к MySQL (env‑переменные DB_HOST, DB_NAME, DB_USER, DB_PASS).
+
+Аутентификация: в /auth/ реализовать login.php, register.php, logout.php, me.php (JSON), сессии на PHP (cookies).
+
+API‑слой: /api/… для необходимых действий фронта (минимум auth/login, auth/register, auth/me).
+
+.htaccess: в public_html/.htaccess настроить SPA‑роутинг (отдавать index.html), исключая /api и /auth.
+
+Патч фронтенда без исходников
+
+patch.js:
+
+Переопределить window.fetch и XMLHttpRequest: любые запросы к доменам эталона перенаправлять на локальные /api/…
+
+Повесить обработчики на кнопки “登录/注册” в хедере: сабмитить на /auth/login.php и /auth/register.php, после успеха — обновлять UI‑состояние (класс logged-in и т.п.).
+
+Для недоступных внешних вызовов — мокать нормальные ответы (JSON) из /js/mocks/*.json.
+
+Состояние UI: после успешного входа вешать признак авторизации (например, data-auth="true" на <body>) и отображать авторизованные блоки так же, как на эталоне.
+
+Админка
+
+/admin/: авторизация администратора, таблица пользователей, формы создания/редактирования, поля: username, nickname, balance, status.
+
+Защита: простая ролевая модель, csrf‑токены, базовая валидация.
+
+CRUD: POST‑маршруты: /admin/users/create, /admin/users/update, /admin/users/delete.
+
+Проверки и отчет
+
+Self‑check: убедиться, что в консоли нет ошибок, все страницы открываются локально, поведение совпадает.
+
+Автотесты: скриншоты ключевых страниц до/после и diff (не менее: главная, login, register, пост‑логин дашборд, 2–3 игровых раздела).
+
+Отвязка: ни одного исходящего запроса к домену эталона (проверить через Network).
+
+Deliverables (файлы на выход):
+
+public_html/… — зеркальный фронтенд с инъекцией patch.js
+
+public_html/js/patch.js и /js/mocks/*.json
+
+public_html/.htaccess
+
+api/, auth/, admin/, config/, db/schema.sql
+
+README.md с инструкциями по деплою на PHP‑хостинг
+
+PHP‑бэкенд: схема и эндпоинты
+Схема БД (минимум):
+
+sql
+CREATE TABLE users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(64) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  nickname VARCHAR(64) DEFAULT NULL,
+  balance DECIMAL(12,2) DEFAULT 0.00,
+  role ENUM('user','admin') DEFAULT 'user',
+  status TINYINT DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE sessions (
+  id CHAR(36) PRIMARY KEY,
+  user_id INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  expires_at TIMESTAMP NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE audit_logs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NULL,
+  action VARCHAR(64) NOT NULL,
+  meta JSON NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+Эндпоинты:
+
+POST /auth/register.php — входящие: username, password; выход: {ok, user}.
+
+POST /auth/login.php — входящие: username, password; выход: {ok, user, sessionId} + cookie.
+
+POST /auth/logout.php — завершение сессии.
+
+GET /auth/me.php — текущий пользователь по сессии.
+
+Админка:
+
+POST /admin/users/create.php — username, password, nickname, balance.
+
+POST /admin/users/update.php — id, поля для изменения.
+
+POST /admin/users/delete.php — id.
+
+.htaccess (SPA + API):
+
+apache
+RewriteEngine On
+
+# Отдавать API/PHP как есть
+RewriteCond %{REQUEST_URI} ^/(api|auth|admin|config|db) [NC]
+RewriteRule ^ - [L]
+
+# Статика как есть
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+# Иначе — SPA
+RewriteRule . /index.html [L]
+Интеграция фронтенда без исходников
+Перехват сетевых вызовов:
+
+В patch.js переопределить window.fetch и XHR; если URL относится к доменам эталона — переписать путь на ваш /api/* и вернуть результат вашего PHP.
+
+Инъекция обработчиков UI:
+
+Найти элементы хедера (кнопки 登录/注册, поля ввода).
+
+При клике — отправлять данные на /auth/login.php или /auth/register.php; по успеху — переключать состояние UI (например, скрывать блок входа, показывать меню профиля).
+
+Моки для второго этапа:
+
+Временно отдавать заглушки JSON для разделов, которые тянут внешние API, чтобы UI вел себя как на эталоне до реализации полной логики.
+
+Админка: объем работ
+Разделы:
+
+Список пользователей (поиск, пагинация), создание, редактирование (никнейм, баланс, статус, роль), удаление.
+
+Доступ: только для role = admin; отдельная форма входа администратора.
+
+Аудит: запись действий в audit_logs (кто, что изменил).
+
+Безопасность: хеширование паролей (password_hash), CSRF‑токены, валидация входных данных.
