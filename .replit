@@ -1,4 +1,5 @@
-modules = ["nodejs-20"]
+modules = ["nodejs-20", "php-8.2", "web"]
+run = "node index.js"
 [agent]
 expertMode = true
 
@@ -22,9 +23,12 @@ args = "Web Scraper"
 name = "Web Scraper"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm install puppeteer fs-extra axios cheerio && node index.js"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node index.js"
+
+[deployment]
+run = ["sh", "-c", "node index.js"]
