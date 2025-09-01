@@ -42,26 +42,24 @@ if (empty($username) || empty($password)) {
 
 $authenticated = false;
 $user_id = null;
-$user_nickname = null;
-$user_balance = null;
+$user_email = null;
 
 // Try database authentication first
 $pdo = getDBConnection();
 if ($pdo) {
     try {
-        $stmt = $pdo->prepare("SELECT id, username, password_hash, nickname, balance FROM users WHERE username = ?");
-        $stmt->execute([$username]);
+        $stmt = $pdo->prepare("SELECT id, username, email, password FROM users WHERE username = ? OR email = ?");
+        $stmt->execute([$username, $username]);
         $user = $stmt->fetch();
         
-        if ($user && password_verify($password, $user['password_hash'])) {
+        if ($user && password_verify($password, $user['password'])) {
             $authenticated = true;
             $user_id = $user['id'];
             $username = $user['username'];
-            $user_nickname = $user['nickname'];
-            $user_balance = $user['balance'];
+            $user_email = $user['email'];
             
-            // Update last login (update updated_at)
-            $stmt = $pdo->prepare("UPDATE users SET updated_at = NOW() WHERE id = ?");
+            // Update last login
+            $stmt = $pdo->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
             $stmt->execute([$user_id]);
         }
     } catch (PDOException $e) {
@@ -74,8 +72,7 @@ if (!$authenticated) {
     $authenticated = authenticateWithFile($username, $password);
     if ($authenticated) {
         $user_id = 1; // Default user ID
-        $user_nickname = $username;
-        $user_balance = '1000.00';
+        $user_email = $username . '@example.com';
     }
 }
 
@@ -86,8 +83,7 @@ if ($authenticated) {
     // Set session variables
     $_SESSION['user_id'] = $user_id;
     $_SESSION['username'] = $username;
-    $_SESSION['nickname'] = $user_nickname ?? $username;
-    $_SESSION['balance'] = $user_balance ?? '0.00';
+    $_SESSION['email'] = $user_email;
     $_SESSION['last_activity'] = time();
     $_SESSION['login_time'] = time();
     
@@ -100,8 +96,7 @@ if ($authenticated) {
         'user' => [
             'id' => $user_id,
             'username' => $username,
-            'nickname' => $user_nickname ?? $username,
-            'balance' => $user_balance ?? '0.00'
+            'email' => $user_email
         ]
     ]);
 } else {
