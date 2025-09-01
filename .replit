@@ -5,7 +5,7 @@ expertMode = true
 
 [nix]
 channel = "stable-25_05"
-packages = ["chromium", "glib", "nss", "php", "nginx"]
+packages = ["chromium", "glib", "nss", "php", "nginx", "postgresql", "php84Extensions.pgsql", "php84Extensions.pdo_pgsql"]
 
 [workflows]
 runButton = "Project"

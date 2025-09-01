@@ -28,11 +28,11 @@ $username = trim($_POST['username'] ?? $_POST['login'] ?? $_POST['email'] ?? '')
 $password = $_POST['password'] ?? '';
 $csrf_token = $_POST['csrf_token'] ?? '';
 
-// Validate CSRF token (temporarily disabled for testing)
-// if (!verifyCSRFToken($csrf_token)) {
-//     echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
-//     exit;
-// }
+// Validate CSRF token
+if (!verifyCSRFToken($csrf_token)) {
+    echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+    exit;
+}
 
 // Validate input
 if (empty($username) || empty($password)) {
@@ -42,7 +42,8 @@ if (empty($username) || empty($password)) {
 
 $authenticated = false;
 $user_id = null;
-$user_email = null;
+$user_nickname = null;
+$user_balance = null;
 
 // Try database authentication first
 $pdo = getDBConnection();
@@ -99,7 +100,8 @@ if ($authenticated) {
         'user' => [
             'id' => $user_id,
             'username' => $username,
-            'email' => $user_email
+            'nickname' => $user_nickname ?? $username,
+            'balance' => $user_balance ?? '0.00'
         ]
     ]);
 } else {
