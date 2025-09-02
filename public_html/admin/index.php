@@ -39,6 +39,19 @@ if ($pdo) {
                     $stmt->execute([$userId]);
                     $message = "User deleted successfully";
                     break;
+                    
+                case 'create_user':
+                    $username = $_POST['username'];
+                    $password = $_POST['password'];
+                    $nickname = $_POST['nickname'];
+                    $balance = $_POST['balance'] ?? '0.00';
+                    $status = $_POST['status'] ?? 'active';
+                    
+                    $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+                    $stmt = $pdo->prepare("INSERT INTO users (username, password_hash, nickname, balance, status, created_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)");
+                    $stmt->execute([$username, $passwordHash, $nickname, $balance, $status]);
+                    $message = "User created successfully";
+                    break;
             }
             
             // Refresh user list
@@ -149,6 +162,40 @@ if ($pdo) {
         <?php if ($message): ?>
             <div class="message"><?php echo htmlspecialchars($message); ?></div>
         <?php endif; ?>
+        
+        <!-- Create User Form -->
+        <div class="container" style="margin-bottom: 30px;">
+            <h2>Create New User</h2>
+            <form method="POST" style="display: flex; gap: 10px; align-items: end;">
+                <div>
+                    <label>Username:</label>
+                    <input type="text" name="username" required>
+                </div>
+                <div>
+                    <label>Password:</label>
+                    <input type="password" name="password" required>
+                </div>
+                <div>
+                    <label>Nickname:</label>
+                    <input type="text" name="nickname" required>
+                </div>
+                <div>
+                    <label>Balance:</label>
+                    <input type="number" step="0.01" name="balance" value="0.00">
+                </div>
+                <div>
+                    <label>Status:</label>
+                    <select name="status">
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="banned">Banned</option>
+                    </select>
+                </div>
+                <div>
+                    <button type="submit" name="action" value="create_user" class="btn btn-success">Create User</button>
+                </div>
+            </form>
+        </div>
         
         <h2>Users (<?php echo count($users); ?>)</h2>
         
