@@ -28,7 +28,7 @@ if ($pdo) {
                     $balance = $_POST['balance'];
                     $status = $_POST['status'];
                     
-                    $stmt = $pdo->prepare("UPDATE users SET nickname = ?, balance = ?, status = ?, updated_at = NOW() WHERE id = ?");
+                    $stmt = $pdo->prepare("UPDATE users SET nickname = ?, balance = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
                     $stmt->execute([$nickname, $balance, $status, $userId]);
                     $message = "User updated successfully";
                     break;
